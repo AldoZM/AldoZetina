@@ -130,3 +130,45 @@ return query (select v.nota,v.fecha_venta,concat(c.nombre,' ',c.apellido_paterno
 END;
 $$
 LANGUAGE plpgsql;
+
+-- Multifunción ADRIAN
+CREATE OR REPLACE FUNCTION multifuncion_stock()
+RETURNS trigger AS
+$$
+declare id_funcion int;
+begin
+
+if((select cantidad_bodega - (select cantidad_articulo from detalle_venta where num_venta=(select num_venta from detalle_venta  group by num_venta
+      having max(num_venta)=(select max(num_venta) from detalle_venta )))from INVENTARIO where codigo_barras=(select codigo_barras from PRODUCTO P where id_producto=
+        (select id_producto from detalle_venta where num_venta=(select num_venta from detalle_venta  group by num_venta
+           having max(num_venta)=(select max(num_venta) from detalle_venta )))))< 0) then raise notice 'Inventario lleno: Venta no registrada';
+            delete from detalle_venta where num_venta=(select (max(num_venta)) from detalle_venta);
+             return null;
+else
+UPDATE detalle_venta
+ set precio_producto=
+  (select precio_venta from PRODUCTO P where id_producto=(select id_producto from detalle_venta where num_venta=(select num_venta from detalle_venta group by num_venta
+    having max(num_venta)=(select max(num_venta) from detalle_venta )))) where num_venta=(select max(num_venta) from detalle_venta);
+
+    UPDATE detalle_venta set total_pagar=(select cantidad_articulo*(select precio_producto from detalle_venta where num_venta=(select num_venta
+      from detalle_venta  group by num_venta having max(num_venta)=(select max(num_venta) from detalle_venta )))from detalle_venta
+       where num_venta=(select num_venta from detalle_venta  group by num_venta having max(num_venta)=(select max(num_venta) from detalle_venta )))
+        where num_venta=(select max(num_venta) from detalle_venta );
+
+     UPDATE INVENTARIO set cantidad_bodega= (select cantidad_bodega -(select cantidad_articulo from detalle_venta where num_venta=(select num_venta from detalle_venta  group by num_venta
+      having max(num_venta)=(select max(num_venta) from detalle_venta ))) from INVENTARIO where codigo_barras=(select codigo_barras from PRODUCTO P where id_producto=
+        (select id_producto from detalle_venta where num_venta=(select num_venta from detalle_venta  group by num_venta having max(num_venta)=
+         (select max(num_venta) from detalle_venta ))))) where codigo_barras=(select codigo_barras from PRODUCTO P where id_producto=(select id_producto from detalle_venta
+            where num_venta=(select num_venta from detalle_venta group by num_venta having max(num_venta)=(select max(num_venta) from detalle_venta ))));
+
+	if((select cantidad_bodega -(select cantidad_articulo from detalle_venta where num_venta=(select num_venta from detalle_venta  group by num_venta
+      having max(num_venta)=(select max(num_venta) from detalle_venta ))) from INVENTARIO where codigo_barras=(select codigo_barras from PRODUCTO P where id_producto=
+        (select id_producto from detalle_venta where num_venta=(select num_venta from detalle_venta  group by num_venta having max(num_venta)=(select max(num_venta) from detalle_venta )))))<=3) then
+          raise notice 'Advertencia: Stock del producto es menor o igual a 3';
+	end if;
+	 raise notice 'No se pudo insertar';
+     return new;
+	 end if;
+END;
+$$
+LANGUAGE plpgsql;
